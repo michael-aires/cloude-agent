@@ -57,6 +57,11 @@ AGENTS.md
 !/.claude/commands/process-note.md
 
 !/.claude/skills/skill-creator
+!/.claude/skills/customer-support-triage
+!/.claude/skills/bug-ticket-creator
+!/.claude/skills/feature-request-handler
+!/.claude/skills/prd-creator
+!/.claude/skills/system-knowledge-base
 !/.claude/CLAUDE.md
 
 workspace_tree.py
