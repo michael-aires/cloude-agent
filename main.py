@@ -175,6 +175,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount iOS gateway API
+from gateway import router as gateway_router
+app.include_router(gateway_router)
+
 
 async def verify_api_key(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
