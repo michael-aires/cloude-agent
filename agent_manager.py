@@ -1113,6 +1113,25 @@ class AgentManager:
             ex=86400 * 7
         )
 
+    def _check_artifact_path(self, file_path: str) -> Optional[str]:
+        """Check if a file path points to an artifact and return its relative path, or None."""
+        if not file_path:
+            return None
+        # Normalize the path
+        normalized = file_path.replace("\\", "/").lstrip("./")
+        # Check if it's under the artifacts directory
+        artifacts_prefix = "artifacts/"
+        workspace_artifacts = str(WORKSPACE_DIR / "artifacts") + "/"
+        if normalized.startswith(artifacts_prefix):
+            return normalized[len(artifacts_prefix):]
+        if normalized.startswith(workspace_artifacts):
+            return normalized[len(workspace_artifacts):]
+        # Also check absolute paths
+        if file_path.startswith("/") and "/artifacts/" in file_path:
+            idx = file_path.index("/artifacts/") + len("/artifacts/")
+            return file_path[idx:]
+        return None
+
     def _compose_user_text(
         self,
         message: str,
@@ -1440,6 +1459,7 @@ class AgentManager:
                 model=(current_options.model or None),
             )
             emitted_any_output = False
+            _last_tool_file_path = ""
             client = ClaudeSDKClient(opts)
             try:
                 await client.connect()
@@ -1463,10 +1483,27 @@ class AgentManager:
                             elif isinstance(block, ToolUseBlock):
                                 emitted_any_output = True
                                 tools_used.append(block.name)
-                                yield {"type": "tool", "name": block.name, "status": "started"}
+                                tool_event = {"type": "tool", "name": block.name, "status": "started"}
+                                # Extract file_path from tool input for artifact detection
+                                tool_input = getattr(block, "input", None)
+                                if isinstance(tool_input, dict):
+                                    fp = tool_input.get("file_path") or tool_input.get("path") or ""
+                                    if fp:
+                                        tool_event["file_path"] = fp
+                                        _last_tool_file_path = fp
+                                yield tool_event
                     elif isinstance(msg, UserMessage):
                         if tools_used:
-                            yield {"type": "tool", "name": tools_used[-1], "status": "completed"}
+                            completed_event = {"type": "tool", "name": tools_used[-1], "status": "completed"}
+                            if _last_tool_file_path:
+                                completed_event["file_path"] = _last_tool_file_path
+                            yield completed_event
+                            # Emit artifact event if the tool wrote to artifacts/
+                            if _last_tool_file_path and tools_used[-1] in ("Write", "Edit"):
+                                art_path = self._check_artifact_path(_last_tool_file_path)
+                                if art_path:
+                                    yield {"type": "artifact", "path": art_path, "action": "updated"}
+                            _last_tool_file_path = ""
                     elif isinstance(msg, ResultMessage):
                         claude_session_id = msg.session_id or claude_session_id
                         usage = msg.usage or {"num_turns": msg.num_turns}

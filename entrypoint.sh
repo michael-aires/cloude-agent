@@ -101,6 +101,16 @@ EOF
     fi
 fi
 
+# Authenticate GitHub CLI if GITHUB_TOKEN is set
+if command -v gh >/dev/null 2>&1 && [ -n "$GITHUB_TOKEN" ]; then
+    export GH_TOKEN="$GITHUB_TOKEN"
+fi
+
+# Seed .mcp.json for MCP server definitions (non-destructive).
+if [ -f "/app/.mcp.json" ]; then
+    cp -n "/app/.mcp.json" "$WORKSPACE_DIR/.mcp.json" 2>/dev/null || true
+fi
+
 # Make all skill scripts executable
 find "$SKILLS_DIR" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 find "$SKILLS_DIR" -name "*.py" -exec chmod +x {} \; 2>/dev/null || true
